@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="DotnetAzureStarter.Api.Tests/DotnetAzureStarter.Api.Tests.csproj" />
+  <Project Path="DotnetAzureStarter.Api/DotnetAzureStarter.Api.csproj" />
+  <Project Path="DotnetAzureStarter.Core.Tests/DotnetAzureStarter.Core.Tests.csproj" />
+  <Project Path="DotnetAzureStarter.Core/DotnetAzureStarter.Core.csproj" />
+  <Project Path="DotnetAzureStarter.Infrastructure/DotnetAzureStarter.Infrastructure.csproj" />
+</Solution>
