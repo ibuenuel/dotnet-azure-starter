@@ -8,7 +8,7 @@
 
 > Built as a reference implementation for Senior Engineers and a starting point for new projects. Every pattern here has a reason; nothing is added speculatively.
 
-> **Status:** Core domain layer complete (Phase 2 of 7). Infrastructure, Docker, Azure, and CI/CD are planned — see [Roadmap](#roadmap).
+> **Status:** Infrastructure & full CRUD API complete (Phase 3 of 7). Docker Compose is ready for local SQL Server. Azure and CI/CD are planned — see [Roadmap](#roadmap).
 
 ---
 
@@ -71,12 +71,12 @@ public async Task<Result<TodoResponseDto>> GetByIdAsync(Guid id)
 
 // Controller maps the result to an HTTP response — no try/catch
 return result.Match(
-    onSuccess: dto  => Ok(ApiResponse<TodoResponseDto>.Ok(dto, traceId)),
+    onSuccess: dto  => Ok(ApiResponse<TodoResponseDto>.Ok(dto)),
     onFailure: error => error.Type switch
     {
-        ErrorType.NotFound   => NotFound(ApiResponse<TodoResponseDto>.Fail(error, traceId)),
-        ErrorType.Validation => UnprocessableEntity(ApiResponse<TodoResponseDto>.Fail(error, traceId)),
-        _                    => StatusCode(500, ApiResponse<TodoResponseDto>.Fail(error, traceId))
+        ErrorType.NotFound   => NotFound(ApiResponse<TodoResponseDto>.Fail(error)),
+        ErrorType.Validation => UnprocessableEntity(ApiResponse<TodoResponseDto>.Fail(error)),
+        _                    => StatusCode(500, ApiResponse<TodoResponseDto>.Fail(error))
     });
 ```
 
@@ -114,19 +114,19 @@ var result = await _todoService.GetAllAsync(new PaginationRequest(page: 1, pageS
 
 | Layer | Technology | Status |
 |---|---|---|
-| Runtime | .NET 10 | ✅ Implemented |
-| API | ASP.NET Core Web API | ✅ Implemented |
-| ORM | Entity Framework Core 10 | Planned — Phase 3 |
-| Database (local) | SQL Server 2022 via Docker | Planned — Phase 4 |
+| Runtime | .NET 10 | Implemented |
+| API | ASP.NET Core Web API | Implemented |
+| ORM | Entity Framework Core 10 | Implemented |
+| Database (local) | SQL Server 2022 via Docker Compose | Implemented |
 | Database (cloud) | Azure SQL Database | Planned — Phase 5 |
 | Auth | Azure AD / Microsoft Entra ID | Planned — Phase 6+ |
 | Cloud | Microsoft Azure (App Service, SQL, Key Vault) | Planned — Phase 5 |
 | IaC | Azure Bicep | Planned — Phase 5 |
 | CI/CD | GitHub Actions | Planned — Phase 6 |
-| Containers | Docker + Docker Compose | Planned — Phase 4 |
-| API Docs | Built-in .NET 10 OpenAPI | ✅ Implemented |
+| Containers | Docker + Docker Compose | Partial — DB only (Phase 4: full stack) |
+| API Docs | Built-in .NET 10 OpenAPI | Implemented |
 | Testing | xUnit · Moq · FluentAssertions · NetArchTest | Planned — Phase 7 |
-| Validation | FluentValidation | Planned — Phase 3 |
+| Validation | FluentValidation | Planned — Phase 7 |
 | Logging | Serilog + Azure Application Insights | Planned — Phase 7 |
 
 ---
@@ -139,7 +139,7 @@ dotnet-azure-starter/
 │   ├── Middleware/                      # (placeholder — correlation ID middleware planned)
 │   └── Program.cs
 │
-├── DotnetAzureStarter.Core/             # Domain layer — zero external dependencies ✅
+├── DotnetAzureStarter.Core/             # Domain layer — zero external dependencies (Implemented)
 │   ├── Common/
 │   │   ├── Result.cs                    # Void result (Delete, Send)
 │   │   ├── ResultOfT.cs                 # Typed result Result<T>
@@ -155,17 +155,26 @@ dotnet-azure-starter/
 │   ├── DTOs/                            # Request / response shapes
 │   └── Extensions/                      # Entity ↔ DTO mapping
 │
-├── DotnetAzureStarter.Infrastructure/   # Data access — planned Phase 3
-│   ├── Data/                            # AppDbContext (planned)
-│   ├── Repositories/                    # GenericRepository<T> + entity repositories (planned)
-│   └── Services/                        # Business logic implementations (planned)
+├── DotnetAzureStarter.Infrastructure/   # Data access (Implemented)
+│   ├── Data/
+│   │   ├── AppDbContext.cs              # EF Core DbContext with auto-audit timestamps
+│   │   ├── UnitOfWork.cs               # IUnitOfWork implementation — atomic CommitAsync
+│   │   ├── DatabaseSeeder.cs           # Dev seed data (idempotent)
+│   │   └── Configurations/             # EF Core Fluent API entity configurations
+│   ├── Repositories/
+│   │   ├── GenericRepository.cs        # Base CRUD + paginated queries
+│   │   └── TodoRepository.cs           # Domain-specific queries (completed, priority, search)
+│   ├── Services/
+│   │   └── TodoService.cs              # Business logic, returns Result<T>
+│   └── Options/
+│       └── DatabaseOptions.cs          # Strongly typed DB config (Options Pattern)
 │
 ├── DotnetAzureStarter.Core.Tests/       # Unit tests — test project scaffolded, tests planned Phase 7
 ├── DotnetAzureStarter.Api.Tests/        # Integration tests — test project scaffolded, tests planned Phase 7
 │
 ├── infra/                               # Azure Bicep — App Service, SQL, Key Vault (planned Phase 5)
 ├── .github/workflows/                   # CI/CD pipelines (planned Phase 6)
-├── docker-compose.yml                   # Local dev stack (planned Phase 4)
+├── docker-compose.yml                   # SQL Server 2022 local dev container (Implemented)
 └── .editorconfig                        # Compiler-enforced code style
 ```
 
@@ -176,27 +185,29 @@ dotnet-azure-starter/
 ### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (required once Phase 4 is complete)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) (required once Phase 5 is complete)
 
-### Build and run (current state)
+### Run locally
 
 ```bash
 # Clone
 git clone https://github.com/ibuenuel/dotnet-azure-starter.git
 cd dotnet-azure-starter
 
-# Build
-dotnet build
+# 1. Start the SQL Server container
+docker compose up -d
 
-# Run the API
+# 2. Build and run the API
+#    On first startup: EF Core migrations run automatically and sample data is seeded
 dotnet run --project DotnetAzureStarter.Api
-
-# OpenAPI docs at:  http://localhost:5000/openapi/v1.json
-# Health check at:  http://localhost:5000/health
 ```
 
-> Docker Compose (`docker compose up --build`) will be available once Phase 4 is complete.
+```
+API:        http://localhost:5290
+OpenAPI:    http://localhost:5290/openapi/v1.json
+Health:     http://localhost:5290/health
+```
 
 ### Run tests
 
@@ -212,9 +223,21 @@ dotnet test
 
 ---
 
-## API Endpoints
+## Docker
 
-> Controllers and route handlers will be implemented in Phase 3. The interfaces below are already defined in `Core/Interfaces/Services/ITodoService.cs`.
+The `docker-compose.yml` starts a SQL Server 2022 container with a named volume for data persistence.
+
+```bash
+docker compose up -d        # start SQL Server in background
+docker compose down         # stop (data volume is preserved)
+docker compose down -v      # stop and delete all data
+```
+
+The API auto-migrates and seeds on startup in Development — no manual `dotnet ef database update` needed.
+
+---
+
+## API Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -272,8 +295,8 @@ This boilerplate is built around the following non-negotiable standards:
 
 - [x] Phase 1 — Solution scaffold, Clean Architecture structure, Git setup
 - [x] Phase 2 — Core domain: entities, interfaces, Result pattern, DTOs, value objects
-- [ ] Phase 3 — Infrastructure: EF Core, repositories, Unit of Work, service implementations, controllers
-- [ ] Phase 4 — Docker: multi-stage Dockerfile, docker-compose, health checks
+- [x] Phase 3 — Infrastructure: EF Core, repositories, Unit of Work, service implementations, controllers
+- [ ] Phase 4 — Docker: multi-stage Dockerfile, full docker-compose stack (API + DB), health checks
 - [ ] Phase 5 — Azure Bicep: App Service, SQL Database, Key Vault
 - [ ] Phase 6 — GitHub Actions: CI pipeline, CD to Azure App Service
 - [ ] Phase 7 — Polish: architecture tests, Serilog, Application Insights, FluentValidation, README badges
