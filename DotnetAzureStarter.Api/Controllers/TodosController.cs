@@ -37,7 +37,12 @@ public sealed class TodosController : ControllerBase
 
         return result.Match(
             onSuccess: paged => Ok(ApiResponse<PagedResult<TodoResponseDto>>.Ok(paged)),
-            onFailure: error => StatusCode(500, ApiResponse<PagedResult<TodoResponseDto>>.Fail(error)));
+            onFailure: error => error.Type switch
+            {
+                ErrorType.NotFound => NotFound(ApiResponse<PagedResult<TodoResponseDto>>.Fail(error)),
+                ErrorType.Validation => UnprocessableEntity(ApiResponse<PagedResult<TodoResponseDto>>.Fail(error)),
+                _ => StatusCode(500, ApiResponse<PagedResult<TodoResponseDto>>.Fail(error))
+            });
     }
 
     /// <summary>Returns a single todo item by ID.</summary>
