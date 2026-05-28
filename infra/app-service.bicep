@@ -59,6 +59,8 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   }
 }
 
+var acrCreds = listCredentials(resourceId('Microsoft.ContainerRegistry/registries', acrName), '2023-07-01')
+
 resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   name: webAppName
   location: location
@@ -106,11 +108,11 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'DOCKER_REGISTRY_SERVER_USERNAME'
-          value: listCredentials(resourceId('Microsoft.ContainerRegistry/registries', acrName), '2023-07-01').username
+          value: acrCreds.username
         }
         {
           name: 'DOCKER_REGISTRY_SERVER_PASSWORD'
-          value: listCredentials(resourceId('Microsoft.ContainerRegistry/registries', acrName), '2023-07-01').passwords[0].value
+          value: acrCreds.passwords[0].value
         }
       ]
     }

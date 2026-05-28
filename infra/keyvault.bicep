@@ -41,4 +41,5 @@ resource dbSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
 
 output keyVaultName string = keyVault.name
 output keyVaultUri string = keyVault.properties.vaultUri
+@secure()
 output dbSecretUri string = dbSecret.properties.secretUri

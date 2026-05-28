@@ -71,6 +71,8 @@ module appModule 'app-service.bicep' = {
 // in Database__ConnectionString resolves at runtime.
 // Name must be computed at deploy-start, so we reproduce the same formula used in keyvault.bicep.
 
+// Must match the formula in keyvault.bicep — BCP120 prevents using kvModule.outputs.keyVaultName
+// in an 'existing' reference. If the naming convention changes, update both files in sync.
 var keyVaultName = 'kv-${prefix}-${environment}'
 
 resource existingKeyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {

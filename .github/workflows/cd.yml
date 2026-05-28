@@ -65,8 +65,53 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Setup .NET 10 for EF migrations
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install EF Core CLI
+        run: dotnet tool install --global dotnet-ef --version 10.* || dotnet tool update --global dotnet-ef --version 10.*
+
+      - name: Restore
+        run: dotnet restore DotnetAzureStarter.slnx
+
+      - name: Build (required for EF migrations)
+        run: dotnet build DotnetAzureStarter.slnx --no-restore --configuration Release
+
+      - name: Allow runner IP through SQL firewall
+        run: |
+          RUNNER_IP=$(curl -sf https://api.ipify.org) || { echo "Could not determine runner IP"; exit 1; }
+          az sql server firewall-rule create \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --server sql-${{ secrets.AZURE_PREFIX }}-${{ secrets.AZURE_ENVIRONMENT }} \
+            --name GithubActionsRunner \
+            --start-ip-address "$RUNNER_IP" \
+            --end-ip-address "$RUNNER_IP"
+
+      - name: Run EF Core migrations
+        env:
+          Database__ConnectionString: ${{ secrets.AZURE_SQL_CONNECTION_STRING }}
+        run: |
+          dotnet ef database update \
+            --no-build \
+            --project DotnetAzureStarter.Infrastructure/DotnetAzureStarter.Infrastructure.csproj \
+            --startup-project DotnetAzureStarter.Api/DotnetAzureStarter.Api.csproj \
+            --verbose
+
+      - name: Remove runner IP from SQL firewall
+        if: always()
+        run: |
+          az sql server firewall-rule delete \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --server sql-${{ secrets.AZURE_PREFIX }}-${{ secrets.AZURE_ENVIRONMENT }} \
+            --name GithubActionsRunner \
+            --yes || true
+
       - name: Login to ACR
-        run: az acr login --name ${{ secrets.ACR_LOGIN_SERVER }}
+        run: |
+          ACR_NAME="${{ secrets.ACR_LOGIN_SERVER }}"
+          az acr login --name "${ACR_NAME%%.*}"
 
       - name: Set image tag
         id: tag
@@ -86,44 +131,6 @@ jobs:
         with:
           app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
           images: ${{ steps.tag.outputs.IMAGE_TAG }}
-
-      - name: Setup .NET 10 for EF migrations
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Install EF Core CLI
-        run: dotnet tool install --global dotnet-ef
-
-      - name: Restore (EF tool needs packages)
-        run: dotnet restore DotnetAzureStarter.slnx
-
-      - name: Allow runner IP through SQL firewall
-        run: |
-          RUNNER_IP=$(curl -s https://api.ipify.org)
-          az sql server firewall-rule create \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --server sql-${{ secrets.AZURE_PREFIX }}-${{ secrets.AZURE_ENVIRONMENT }} \
-            --name GithubActionsRunner \
-            --start-ip-address "$RUNNER_IP" \
-            --end-ip-address "$RUNNER_IP"
-
-      - name: Run EF Core migrations
-        env:
-          Database__ConnectionString: ${{ secrets.AZURE_SQL_CONNECTION_STRING }}
-        run: |
-          dotnet ef database update \
-            --project DotnetAzureStarter.Infrastructure/DotnetAzureStarter.Infrastructure.csproj \
-            --startup-project DotnetAzureStarter.Api/DotnetAzureStarter.Api.csproj \
-            --verbose
-
-      - name: Remove runner IP from SQL firewall
-        if: always()
-        run: |
-          az sql server firewall-rule delete \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --server sql-${{ secrets.AZURE_PREFIX }}-${{ secrets.AZURE_ENVIRONMENT }} \
-            --name GithubActionsRunner
 
       - name: Verify deployment health
         run: |
