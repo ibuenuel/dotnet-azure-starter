@@ -8,7 +8,7 @@
 
 > Built as a reference implementation for Senior Engineers and a starting point for new projects. Every pattern here has a reason; nothing is added speculatively.
 
-> **Status:** Full Docker stack complete (Phase 4 of 7). `docker compose up --build` starts the entire stack — API + SQL Server — with auto-migration and seeding. Azure and CI/CD are planned — see [Roadmap](#roadmap).
+> **Status:** Full test suite implemented (Phases 1–4 + tests complete). 72 tests covering unit, integration, and architecture rules — all green. Azure and CI/CD are planned — see [Roadmap](#roadmap).
 
 ---
 
@@ -51,7 +51,7 @@ Clean Architecture with four strict layers. Dependencies flow inward only.
 | Api → Infrastructure | Core → Api |
 | Infrastructure → Core | Infrastructure → Api |
 
-Architecture tests (NetArchTest) will enforce these rules at build time in Phase 7 — a misplaced `using` will become a failing test, not a code review comment.
+Architecture tests (NetArchTest) enforce these rules at build time — a misplaced `using` is a failing test, not a code review comment.
 
 ---
 
@@ -118,16 +118,16 @@ var result = await _todoService.GetAllAsync(new PaginationRequest(page: 1, pageS
 | API | ASP.NET Core Web API | Implemented |
 | ORM | Entity Framework Core 10 | Implemented |
 | Database (local) | SQL Server 2022 via Docker Compose | Implemented |
-| Database (cloud) | Azure SQL Database | Planned — Phase 5 |
-| Auth | Azure AD / Microsoft Entra ID | Planned — Phase 6+ |
-| Cloud | Microsoft Azure (App Service, SQL, Key Vault) | Planned — Phase 5 |
-| IaC | Azure Bicep | Planned — Phase 5 |
-| CI/CD | GitHub Actions | Planned — Phase 6 |
+| Database (cloud) | Azure SQL Database | Planned — Phase 6 |
+| Auth | Azure AD / Microsoft Entra ID | Planned — Phase 7+ |
+| Cloud | Microsoft Azure (App Service, SQL, Key Vault) | Planned — Phase 6 |
+| IaC | Azure Bicep | Planned — Phase 6 |
+| CI/CD | GitHub Actions | Planned — Phase 7 |
 | Containers | Docker + Docker Compose | Implemented |
 | API Docs | Built-in .NET 10 OpenAPI | Implemented |
-| Testing | xUnit · Moq · FluentAssertions · NetArchTest | Planned — Phase 7 |
-| Validation | FluentValidation | Planned — Phase 7 |
-| Logging | Serilog + Azure Application Insights | Planned — Phase 7 |
+| Testing | xUnit · Moq · FluentAssertions · NetArchTest · Testcontainers | Implemented |
+| Validation | FluentValidation | Planned — Phase 8 |
+| Logging | Serilog + Azure Application Insights | Planned — Phase 8 |
 
 ---
 
@@ -169,8 +169,15 @@ dotnet-azure-starter/
 │   └── Options/
 │       └── DatabaseOptions.cs          # Strongly typed DB config (Options Pattern)
 │
-├── DotnetAzureStarter.Core.Tests/       # Unit tests — test project scaffolded, tests planned Phase 7
-├── DotnetAzureStarter.Api.Tests/        # Integration tests — test project scaffolded, tests planned Phase 7
+├── DotnetAzureStarter.Core.Tests/       # Unit + architecture tests (62 tests — xUnit, Moq, NetArchTest)
+│   ├── Common/                          # Result, Error, ApiResponse, PagedResult, PaginationRequest
+│   ├── Extensions/                      # Entity ↔ DTO mapping
+│   ├── Services/                        # TodoService (Moq-based, IUnitOfWork mocked)
+│   └── Architecture/                    # Layer dependency rules (NetArchTest)
+│
+├── DotnetAzureStarter.Api.Tests/        # Integration tests (10 tests — WebApplicationFactory + Testcontainers)
+│   ├── Fixtures/                        # TodoApiFixture — real SQL Server container per test class
+│   └── Controllers/                     # Full CRUD + health check end-to-end
 │
 ├── infra/                               # Azure Bicep — App Service, SQL, Key Vault (planned Phase 5)
 ├── .github/workflows/                   # CI/CD pipelines (planned Phase 6)
@@ -231,10 +238,27 @@ Health:     http://localhost:5290/health
 ### Run tests
 
 ```bash
+# All tests (unit + architecture + integration — Docker required for integration)
 dotnet test
+
+# Unit and architecture tests only (no Docker needed)
+dotnet test DotnetAzureStarter.Core.Tests
+
+# Integration tests only (starts a real SQL Server container via Testcontainers)
+dotnet test DotnetAzureStarter.Api.Tests
+
+# With code coverage
+dotnet test --collect:"XPlat Code Coverage"
 ```
 
-> Test projects are scaffolded. Meaningful unit, integration, and architecture tests will be added in Phase 7.
+| Suite | Count | Requires Docker |
+|---|---|---|
+| Unit tests — `Core.Tests` | 57 | No |
+| Architecture tests — `Core.Tests` | 5 | No |
+| Integration tests — `Api.Tests` | 10 | Yes |
+| **Total** | **72** | |
+
+Integration tests spin up a dedicated SQL Server container automatically (Testcontainers). No manual setup needed — Docker running is sufficient.
 
 ### Deploy to Azure
 
@@ -309,7 +333,7 @@ This boilerplate is built around the following non-negotiable standards:
 
 **TreatWarningsAsErrors** — A missing XML doc comment on a public API is a build failure, not a warning.
 
-**Architecture tests** *(planned Phase 7)* — Layer dependency violations will be caught at build time via NetArchTest.
+**Architecture tests** — Layer dependency violations are caught at build time via NetArchTest. Five rules covering all forbidden cross-layer dependencies run as part of every `dotnet test` invocation.
 
 ---
 
@@ -319,9 +343,10 @@ This boilerplate is built around the following non-negotiable standards:
 - [x] Phase 2 — Core domain: entities, interfaces, Result pattern, DTOs, value objects
 - [x] Phase 3 — Infrastructure: EF Core, repositories, Unit of Work, service implementations, controllers
 - [x] Phase 4 — Docker: multi-stage Dockerfile, full docker-compose stack (API + DB), health checks
-- [ ] Phase 5 — Azure Bicep: App Service, SQL Database, Key Vault
-- [ ] Phase 6 — GitHub Actions: CI pipeline, CD to Azure App Service
-- [ ] Phase 7 — Polish: architecture tests, Serilog, Application Insights, FluentValidation, README badges
+- [x] Phase 5 — Tests: 72 tests across unit, architecture (NetArchTest), and integration (Testcontainers)
+- [ ] Phase 6 — Azure Bicep: App Service, SQL Database, Key Vault
+- [ ] Phase 7 — GitHub Actions: CI pipeline, CD to Azure App Service
+- [ ] Phase 8 — Polish: Serilog, Application Insights, FluentValidation, README badges
 
 ---
 

@@ -80,3 +80,6 @@ app.MapControllers();
 app.MapHealthChecks("/health");
 
 app.Run();
+
+/// <summary>Entry point — exposed as partial so <c>WebApplicationFactory&lt;Program&gt;</c> can reference it from test assemblies.</summary>
+public partial class Program { }
