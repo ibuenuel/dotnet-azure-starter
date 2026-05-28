@@ -1,4 +1,4 @@
-﻿namespace DotnetAzureStarter.Api.Tests;
+namespace DotnetAzureStarter.Api.Tests;
 
 public class UnitTest1
 {
