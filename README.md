@@ -8,7 +8,7 @@
 
 > Built as a reference implementation for Senior Engineers and a starting point for new projects. Every pattern here has a reason; nothing is added speculatively.
 
-> **Status:** Full test suite implemented (Phases 1–4 + tests complete). 72 tests covering unit, integration, and architecture rules — all green. Azure and CI/CD are planned — see [Roadmap](#roadmap).
+> **Status:** Phases 1–6 complete. 72 tests (unit, integration, architecture) — all green. Azure Bicep IaC implemented — one-command provisioning. CI/CD planned — see [Roadmap](#roadmap).
 
 ---
 
@@ -118,10 +118,10 @@ var result = await _todoService.GetAllAsync(new PaginationRequest(page: 1, pageS
 | API | ASP.NET Core Web API | Implemented |
 | ORM | Entity Framework Core 10 | Implemented |
 | Database (local) | SQL Server 2022 via Docker Compose | Implemented |
-| Database (cloud) | Azure SQL Database | Planned — Phase 6 |
+| Database (cloud) | Azure SQL Database | Implemented — Phase 6 |
 | Auth | Azure AD / Microsoft Entra ID | Planned — Phase 7+ |
-| Cloud | Microsoft Azure (App Service, SQL, Key Vault) | Planned — Phase 6 |
-| IaC | Azure Bicep | Planned — Phase 6 |
+| Cloud | Microsoft Azure (App Service, SQL, Key Vault) | Implemented — Phase 6 |
+| IaC | Azure Bicep | Implemented — Phase 6 |
 | CI/CD | GitHub Actions | Planned — Phase 7 |
 | Containers | Docker + Docker Compose | Implemented |
 | API Docs | Built-in .NET 10 OpenAPI | Implemented |
@@ -179,8 +179,13 @@ dotnet-azure-starter/
 │   ├── Fixtures/                        # TodoApiFixture — real SQL Server container per test class
 │   └── Controllers/                     # Full CRUD + health check end-to-end
 │
-├── infra/                               # Azure Bicep — App Service, SQL, Key Vault (planned Phase 5)
-├── .github/workflows/                   # CI/CD pipelines (planned Phase 6)
+├── infra/                               # Azure Bicep IaC (Implemented — Phase 6)
+│   ├── main.bicep                       # Orchestrator — wires all modules + KV access policy
+│   ├── app-service.bicep                # App Service Plan (F1) + Web App + App Insights
+│   ├── sql-server.bicep                 # Azure SQL Server + Database (Basic) + firewall
+│   ├── keyvault.bicep                   # Key Vault + DatabaseConnectionString secret
+│   └── parameters.json                  # Dev environment parameters
+├── .github/workflows/                   # CI/CD pipelines (planned Phase 7)
 ├── docker-compose.yml                   # Full stack: API + SQL Server 2022 (Implemented)
 ├── docker-compose.override.yml          # Local dev overrides (Implemented)
 ├── Dockerfile                           # Multi-stage API container (Implemented)
@@ -196,7 +201,7 @@ dotnet-azure-starter/
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) (required once Phase 5 is complete)
+- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) (required for Azure deployment)
 
 ### Run locally (Docker — recommended)
 
@@ -262,7 +267,57 @@ Integration tests spin up a dedicated SQL Server container automatically (Testco
 
 ### Deploy to Azure
 
-> Azure deployment via Bicep and GitHub Actions is planned for Phases 5 and 6.
+The full Azure stack (App Service, SQL Database, Key Vault, App Insights) is provisioned with a single command via Azure Bicep.
+
+**1. Create the resource group (once):**
+
+```bash
+az group create --name rg-dotnetazstarter-dev --location westeurope
+```
+
+**2. Validate the template (no resources created):**
+
+```bash
+az deployment group validate --resource-group rg-dotnetazstarter-dev --template-file infra/main.bicep --parameters @infra/parameters.json --parameters sqlAdminLogin=sqladmin sqlAdminPassword=<your-password>
+```
+
+**3. Preview what will be created (What-If):**
+
+```bash
+az deployment group what-if --resource-group rg-dotnetazstarter-dev --template-file infra/main.bicep --parameters @infra/parameters.json --parameters sqlAdminLogin=sqladmin sqlAdminPassword=<your-password>
+```
+
+**4. Deploy:**
+
+```bash
+az deployment group create --resource-group rg-dotnetazstarter-dev --template-file infra/main.bicep --parameters @infra/parameters.json --parameters sqlAdminLogin=sqladmin sqlAdminPassword=<your-password>
+```
+
+> **PowerShell users:** Wrap passwords containing `!` in single quotes: `sqlAdminPassword='YourStr0ng!Pwd'`
+
+**5. Verify the deployment:**
+
+```bash
+# Check the app is running
+az webapp show --name app-dotnetazstarter-dev --resource-group rg-dotnetazstarter-dev --query state
+
+# Hit the health endpoint
+curl https://app-dotnetazstarter-dev.azurewebsites.net/health
+```
+
+**Provisioned resources:**
+
+| Resource | Name | Tier |
+|---|---|---|
+| App Service Plan | `asp-dotnetazstarter-dev` | F1 (Free) |
+| Web App (.NET 10) | `app-dotnetazstarter-dev` | F1 |
+| Azure SQL Server | `sql-dotnetazstarter-dev` | — |
+| Azure SQL Database | `StarterDb` | Basic (5 DTU) |
+| Key Vault | `kv-dotnetazstarter-dev` | Standard |
+| Application Insights | `appi-dotnetazstarter-dev` | Pay-as-you-go |
+| Log Analytics Workspace | `log-dotnetazstarter-dev` | Pay-as-you-go |
+
+The database connection string is stored as a Key Vault secret and injected into the App Service at runtime via a [Key Vault reference](https://learn.microsoft.com/en-us/azure/app-service/app-service-key-vault-references) — no secrets in app settings or source control.
 
 ---
 
@@ -344,7 +399,7 @@ This boilerplate is built around the following non-negotiable standards:
 - [x] Phase 3 — Infrastructure: EF Core, repositories, Unit of Work, service implementations, controllers
 - [x] Phase 4 — Docker: multi-stage Dockerfile, full docker-compose stack (API + DB), health checks
 - [x] Phase 5 — Tests: 72 tests across unit, architecture (NetArchTest), and integration (Testcontainers)
-- [ ] Phase 6 — Azure Bicep: App Service, SQL Database, Key Vault
+- [x] Phase 6 — Azure Bicep: App Service, SQL Database, Key Vault, App Insights — one-command provisioning
 - [ ] Phase 7 — GitHub Actions: CI pipeline, CD to Azure App Service
 - [ ] Phase 8 — Polish: Serilog, Application Insights, FluentValidation, README badges
 
