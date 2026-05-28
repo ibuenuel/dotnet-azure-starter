@@ -118,10 +118,10 @@ var result = await _todoService.GetAllAsync(new PaginationRequest(page: 1, pageS
 | API | ASP.NET Core Web API | Implemented |
 | ORM | Entity Framework Core 10 | Implemented |
 | Database (local) | SQL Server 2022 via Docker Compose | Implemented |
-| Database (cloud) | Azure SQL Database | Implemented — Phase 6 |
+| Database (cloud) | Azure SQL Database | Implemented |
 | Auth | Azure AD / Microsoft Entra ID | Planned — Phase 7+ |
-| Cloud | Microsoft Azure (App Service, SQL, Key Vault) | Implemented — Phase 6 |
-| IaC | Azure Bicep | Implemented — Phase 6 |
+| Cloud | Microsoft Azure (App Service, SQL, Key Vault) | Implemented |
+| IaC | Azure Bicep | Implemented — |
 | CI/CD | GitHub Actions | Planned — Phase 7 |
 | Containers | Docker + Docker Compose | Implemented |
 | API Docs | Built-in .NET 10 OpenAPI | Implemented |
@@ -179,7 +179,7 @@ dotnet-azure-starter/
 │   ├── Fixtures/                        # TodoApiFixture — real SQL Server container per test class
 │   └── Controllers/                     # Full CRUD + health check end-to-end
 │
-├── infra/                               # Azure Bicep IaC (Implemented — Phase 6)
+├── infra/                               # Azure Bicep IaC (Implemented)
 │   ├── main.bicep                       # Orchestrator — wires all modules + KV access policy
 │   ├── app-service.bicep                # App Service Plan (F1) + Web App + App Insights
 │   ├── sql-server.bicep                 # Azure SQL Server + Database (Basic) + firewall
