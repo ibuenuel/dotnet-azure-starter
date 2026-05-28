@@ -15,7 +15,8 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 // Add health checks
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>();
 
 // Configure CORS for development
 if (builder.Environment.IsDevelopment())

@@ -8,7 +8,7 @@
 
 > Built as a reference implementation for Senior Engineers and a starting point for new projects. Every pattern here has a reason; nothing is added speculatively.
 
-> **Status:** Infrastructure & full CRUD API complete (Phase 3 of 7). Docker Compose is ready for local SQL Server. Azure and CI/CD are planned — see [Roadmap](#roadmap).
+> **Status:** Full Docker stack complete (Phase 4 of 7). `docker compose up --build` starts the entire stack — API + SQL Server — with auto-migration and seeding. Azure and CI/CD are planned — see [Roadmap](#roadmap).
 
 ---
 
@@ -123,7 +123,7 @@ var result = await _todoService.GetAllAsync(new PaginationRequest(page: 1, pageS
 | Cloud | Microsoft Azure (App Service, SQL, Key Vault) | Planned — Phase 5 |
 | IaC | Azure Bicep | Planned — Phase 5 |
 | CI/CD | GitHub Actions | Planned — Phase 6 |
-| Containers | Docker + Docker Compose | Partial — DB only (Phase 4: full stack) |
+| Containers | Docker + Docker Compose | Implemented |
 | API Docs | Built-in .NET 10 OpenAPI | Implemented |
 | Testing | xUnit · Moq · FluentAssertions · NetArchTest | Planned — Phase 7 |
 | Validation | FluentValidation | Planned — Phase 7 |
@@ -174,7 +174,10 @@ dotnet-azure-starter/
 │
 ├── infra/                               # Azure Bicep — App Service, SQL, Key Vault (planned Phase 5)
 ├── .github/workflows/                   # CI/CD pipelines (planned Phase 6)
-├── docker-compose.yml                   # SQL Server 2022 local dev container (Implemented)
+├── docker-compose.yml                   # Full stack: API + SQL Server 2022 (Implemented)
+├── docker-compose.override.yml          # Local dev overrides (Implemented)
+├── Dockerfile                           # Multi-stage API container (Implemented)
+├── .env.example                         # Environment variable template (Implemented)
 └── .editorconfig                        # Compiler-enforced code style
 ```
 
@@ -188,18 +191,34 @@ dotnet-azure-starter/
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) (required once Phase 5 is complete)
 
-### Run locally
+### Run locally (Docker — recommended)
 
 ```bash
 # Clone
 git clone https://github.com/ibuenuel/dotnet-azure-starter.git
 cd dotnet-azure-starter
 
-# 1. Start the SQL Server container
-docker compose up -d
+# Copy environment file (defaults work out of the box)
+cp .env.example .env
 
-# 2. Build and run the API
-#    On first startup: EF Core migrations run automatically and sample data is seeded
+# Start the full stack — API + SQL Server
+# On first startup: EF Core migrations run automatically and sample data is seeded
+docker compose up --build
+```
+
+```
+API:        http://localhost:8080
+OpenAPI:    http://localhost:8080/openapi/v1.json
+Health:     http://localhost:8080/health
+```
+
+### Run locally (without Docker)
+
+```bash
+# Start only the database
+docker compose up database -d
+
+# Run the API against localhost SQL Server
 dotnet run --project DotnetAzureStarter.Api
 ```
 
@@ -225,15 +244,18 @@ dotnet test
 
 ## Docker
 
-The `docker-compose.yml` starts a SQL Server 2022 container with a named volume for data persistence.
+`docker compose up --build` starts the full stack — API and SQL Server 2022 — with a single command.
 
 ```bash
-docker compose up -d        # start SQL Server in background
-docker compose down         # stop (data volume is preserved)
-docker compose down -v      # stop and delete all data
+docker compose up --build       # build API image and start full stack
+docker compose up --build -d    # same, detached (background)
+docker compose down             # stop (data volume is preserved)
+docker compose down -v          # stop and wipe all data
 ```
 
-The API auto-migrates and seeds on startup in Development — no manual `dotnet ef database update` needed.
+The API container waits for SQL Server to pass its health check before starting (`depends_on: condition: service_healthy`). On first startup, EF Core migrations run automatically and sample data is seeded — no manual steps needed.
+
+`GET /health` probes DB connectivity via EF Core — returns `Healthy` / `Unhealthy` based on whether SQL Server is reachable.
 
 ---
 
@@ -296,7 +318,7 @@ This boilerplate is built around the following non-negotiable standards:
 - [x] Phase 1 — Solution scaffold, Clean Architecture structure, Git setup
 - [x] Phase 2 — Core domain: entities, interfaces, Result pattern, DTOs, value objects
 - [x] Phase 3 — Infrastructure: EF Core, repositories, Unit of Work, service implementations, controllers
-- [ ] Phase 4 — Docker: multi-stage Dockerfile, full docker-compose stack (API + DB), health checks
+- [x] Phase 4 — Docker: multi-stage Dockerfile, full docker-compose stack (API + DB), health checks
 - [ ] Phase 5 — Azure Bicep: App Service, SQL Database, Key Vault
 - [ ] Phase 6 — GitHub Actions: CI pipeline, CD to Azure App Service
 - [ ] Phase 7 — Polish: architecture tests, Serilog, Application Insights, FluentValidation, README badges

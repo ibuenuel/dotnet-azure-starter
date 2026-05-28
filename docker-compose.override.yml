@@ -1,0 +1,4 @@
+services:
+  api:
+    environment:
+      - DOTNET_WATCH_SUPPRESS_MSBUILD_INCREMENTALISM=1
