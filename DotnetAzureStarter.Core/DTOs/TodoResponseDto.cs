@@ -5,7 +5,7 @@ namespace DotnetAzureStarter.Core.DTOs;
 /// <summary>
 /// Data Transfer Object for todo item responses.
 /// </summary>
-public class TodoResponseDto
+public sealed class TodoResponseDto
 {
     /// <summary>Unique identifier for the todo item.</summary>
     public Guid Id { get; set; }

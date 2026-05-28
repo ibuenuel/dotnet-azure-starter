@@ -12,7 +12,7 @@ namespace DotnetAzureStarter.Core.Interfaces;
 public interface IRepository<T> where T : BaseEntity
 {
     /// <summary>Retrieves all entities. Use GetPagedAsync for large datasets.</summary>
-    Task<IEnumerable<T>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<T>> GetAllAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Retrieves a paginated page of entities with navigation metadata.</summary>
     Task<PagedResult<T>> GetPagedAsync(PaginationRequest pagination, CancellationToken cancellationToken = default);

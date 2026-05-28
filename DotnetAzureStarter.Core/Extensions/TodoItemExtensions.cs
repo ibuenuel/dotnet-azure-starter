@@ -44,7 +44,6 @@ public static class TodoItemExtensions
     /// <summary>Updates an existing TodoItem entity with values from UpdateTodoDto.</summary>
     public static TodoItem UpdateFromDto(this TodoItem todoItem, UpdateTodoDto updateDto)
     {
-
         ArgumentNullException.ThrowIfNull(todoItem);
         ArgumentNullException.ThrowIfNull(updateDto);
 
@@ -53,7 +52,6 @@ public static class TodoItemExtensions
         todoItem.IsCompleted = updateDto.IsCompleted;
         todoItem.DueDate = updateDto.DueDate;
         todoItem.Priority = updateDto.Priority;
-        todoItem.UpdatedAt = DateTimeOffset.UtcNow;
 
         return todoItem;
     }

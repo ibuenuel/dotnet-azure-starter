@@ -6,7 +6,7 @@ namespace DotnetAzureStarter.Core.DTOs;
 /// <summary>
 /// Data Transfer Object for creating a new todo item.
 /// </summary>
-public class CreateTodoDto
+public sealed class CreateTodoDto
 {
     /// <summary>The title of the todo item.</summary>
     [Required(ErrorMessage = "Title is required")]
