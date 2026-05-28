@@ -10,6 +10,15 @@ param location string
 @description('Full Key Vault secret URI for Database__ConnectionString (used as KV reference)')
 param dbSecretUri string
 
+@description('Azure Container Registry login server (e.g. myregistry.azurecr.io)')
+param acrLoginServer string
+
+@description('Azure Container Registry resource name (for listCredentials)')
+param acrName string
+
+@description('Docker image name without registry prefix or tag (e.g. dotnetazurestarter-api)')
+param imageName string
+
 var appServicePlanName = 'asp-${prefix}-${environment}'
 var webAppName = 'app-${prefix}-${environment}'
 var appInsightsName = 'appi-${prefix}-${environment}'
@@ -60,8 +69,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
     serverFarmId: appServicePlan.id
     httpsOnly: true
     siteConfig: {
-      // DOTNETCORE|10.0 requires .NET 10 runtime to be available in App Service
-      linuxFxVersion: 'DOTNETCORE|10.0'
+      linuxFxVersion: 'DOCKER|${acrLoginServer}/${imageName}:latest'
       http20Enabled: true
       // alwaysOn is not supported on F1 Free tier
       alwaysOn: false
@@ -86,6 +94,23 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
           value: '~3'
+        }
+        {
+          // App Service routes external traffic to the container port matching ASPNETCORE_URLS
+          name: 'WEBSITES_PORT'
+          value: '8080'
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_URL'
+          value: 'https://${acrLoginServer}'
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_USERNAME'
+          value: listCredentials(resourceId('Microsoft.ContainerRegistry/registries', acrName), '2023-07-01').username
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_PASSWORD'
+          value: listCredentials(resourceId('Microsoft.ContainerRegistry/registries', acrName), '2023-07-01').passwords[0].value
         }
       ]
     }

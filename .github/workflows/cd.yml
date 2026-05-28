@@ -1,0 +1,135 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  IMAGE_NAME: dotnetazurestarter-api
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore DotnetAzureStarter.slnx
+
+      - name: Build
+        run: dotnet build DotnetAzureStarter.slnx --no-restore --configuration Release
+
+      - name: Unit & architecture tests (Core.Tests)
+        run: |
+          dotnet test DotnetAzureStarter.Core.Tests/DotnetAzureStarter.Core.Tests.csproj \
+            --no-build --configuration Release \
+            --logger "trx;LogFileName=core-tests.trx" \
+            --results-directory ./test-results
+
+      - name: Integration tests (Api.Tests — Testcontainers)
+        run: |
+          dotnet test DotnetAzureStarter.Api.Tests/DotnetAzureStarter.Api.Tests.csproj \
+            --no-build --configuration Release \
+            --logger "trx;LogFileName=api-tests.trx" \
+            --results-directory ./test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-cd
+          path: ./test-results/*.trx
+          retention-days: 7
+
+  deploy:
+    name: Build Image & Deploy
+    runs-on: ubuntu-latest
+    needs: test
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ secrets.ACR_LOGIN_SERVER }}
+
+      - name: Set image tag
+        id: tag
+        run: echo "IMAGE_TAG=${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        run: |
+          docker build \
+            --tag ${{ steps.tag.outputs.IMAGE_TAG }} \
+            --tag ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest \
+            .
+          docker push ${{ steps.tag.outputs.IMAGE_TAG }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          images: ${{ steps.tag.outputs.IMAGE_TAG }}
+
+      - name: Setup .NET 10 for EF migrations
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install EF Core CLI
+        run: dotnet tool install --global dotnet-ef
+
+      - name: Restore (EF tool needs packages)
+        run: dotnet restore DotnetAzureStarter.slnx
+
+      - name: Allow runner IP through SQL firewall
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          az sql server firewall-rule create \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --server sql-${{ secrets.AZURE_PREFIX }}-${{ secrets.AZURE_ENVIRONMENT }} \
+            --name GithubActionsRunner \
+            --start-ip-address "$RUNNER_IP" \
+            --end-ip-address "$RUNNER_IP"
+
+      - name: Run EF Core migrations
+        env:
+          Database__ConnectionString: ${{ secrets.AZURE_SQL_CONNECTION_STRING }}
+        run: |
+          dotnet ef database update \
+            --project DotnetAzureStarter.Infrastructure/DotnetAzureStarter.Infrastructure.csproj \
+            --startup-project DotnetAzureStarter.Api/DotnetAzureStarter.Api.csproj \
+            --verbose
+
+      - name: Remove runner IP from SQL firewall
+        if: always()
+        run: |
+          az sql server firewall-rule delete \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --server sql-${{ secrets.AZURE_PREFIX }}-${{ secrets.AZURE_ENVIRONMENT }} \
+            --name GithubActionsRunner
+
+      - name: Verify deployment health
+        run: |
+          echo "Waiting 30s for F1 cold start..."
+          sleep 30
+          STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+            https://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net/health)
+          echo "Health check status: $STATUS"
+          [ "$STATUS" = "200" ] || { echo "Health check failed"; exit 1; }

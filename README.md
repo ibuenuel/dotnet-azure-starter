@@ -3,12 +3,14 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Azure](https://img.shields.io/badge/Azure-App%20Service%20%2B%20SQL-0078D4)](https://azure.microsoft.com)
+[![CI](https://github.com/ibuenuel/dotnet-azure-starter/actions/workflows/ci.yml/badge.svg)](https://github.com/ibuenuel/dotnet-azure-starter/actions/workflows/ci.yml)
+[![CD](https://github.com/ibuenuel/dotnet-azure-starter/actions/workflows/cd.yml/badge.svg)](https://github.com/ibuenuel/dotnet-azure-starter/actions/workflows/cd.yml)
 
 **Production-ready ASP.NET Core 10 boilerplate** implementing Clean Architecture, the Result Pattern, and Unit of Work — ready to clone and build on.
 
 > Built as a reference implementation for Senior Engineers and a starting point for new projects. Every pattern here has a reason; nothing is added speculatively.
 
-> **Status:** Phases 1–6 complete. 72 tests (unit, integration, architecture) — all green. Azure Bicep IaC implemented — one-command provisioning. CI/CD planned — see [Roadmap](#roadmap).
+> **Status:** Phases 1–7 complete. 72 tests (unit, integration, architecture) — all green. Azure Bicep IaC + GitHub Actions CI/CD fully implemented.
 
 ---
 
@@ -122,7 +124,7 @@ var result = await _todoService.GetAllAsync(new PaginationRequest(page: 1, pageS
 | Auth | Azure AD / Microsoft Entra ID | Planned — Phase 7+ |
 | Cloud | Microsoft Azure (App Service, SQL, Key Vault) | Implemented |
 | IaC | Azure Bicep | Implemented — |
-| CI/CD | GitHub Actions | Planned — Phase 7 |
+| CI/CD | GitHub Actions | Implemented |
 | Containers | Docker + Docker Compose | Implemented |
 | API Docs | Built-in .NET 10 OpenAPI | Implemented |
 | Testing | xUnit · Moq · FluentAssertions · NetArchTest · Testcontainers | Implemented |
@@ -181,11 +183,14 @@ dotnet-azure-starter/
 │
 ├── infra/                               # Azure Bicep IaC (Implemented)
 │   ├── main.bicep                       # Orchestrator — wires all modules + KV access policy
-│   ├── app-service.bicep                # App Service Plan (F1) + Web App + App Insights
+│   ├── app-service.bicep                # App Service Plan (F1) + Web App + App Insights + ACR pull
 │   ├── sql-server.bicep                 # Azure SQL Server + Database (Basic) + firewall
 │   ├── keyvault.bicep                   # Key Vault + DatabaseConnectionString secret
+│   ├── acr.bicep                        # Azure Container Registry (Basic)
 │   └── parameters.json                  # Dev environment parameters
-├── .github/workflows/                   # CI/CD pipelines (planned Phase 7)
+├── .github/workflows/                   # CI/CD pipelines (Implemented)
+│   ├── ci.yml                           # PR trigger: restore → build → unit/arch/integration tests
+│   └── cd.yml                           # Push to main: test → ACR push → App Service deploy → migrations
 ├── docker-compose.yml                   # Full stack: API + SQL Server 2022 (Implemented)
 ├── docker-compose.override.yml          # Local dev overrides (Implemented)
 ├── Dockerfile                           # Multi-stage API container (Implemented)
@@ -310,14 +315,84 @@ curl https://app-dotnetazstarter-dev.azurewebsites.net/health
 | Resource | Name | Tier |
 |---|---|---|
 | App Service Plan | `asp-dotnetazstarter-dev` | F1 (Free) |
-| Web App (.NET 10) | `app-dotnetazstarter-dev` | F1 |
+| Web App (Container) | `app-dotnetazstarter-dev` | F1 |
 | Azure SQL Server | `sql-dotnetazstarter-dev` | — |
 | Azure SQL Database | `StarterDb` | Basic (5 DTU) |
 | Key Vault | `kv-dotnetazstarter-dev` | Standard |
+| Container Registry | `dotnetazstarterdevacr` | Basic |
 | Application Insights | `appi-dotnetazstarter-dev` | Pay-as-you-go |
 | Log Analytics Workspace | `log-dotnetazstarter-dev` | Pay-as-you-go |
 
 The database connection string is stored as a Key Vault secret and injected into the App Service at runtime via a [Key Vault reference](https://learn.microsoft.com/en-us/azure/app-service/app-service-key-vault-references) — no secrets in app settings or source control.
+
+---
+
+## CI/CD
+
+GitHub Actions automates the full build → test → deploy pipeline.
+
+### CI (`ci.yml`) — runs on every PR to `main`
+
+```
+Checkout → Setup .NET 10 → Restore → Build
+  → Unit & Architecture Tests (Core.Tests, no Docker)
+  → Integration Tests (Api.Tests, Testcontainers spins up SQL Server)
+  → Upload .trx test results as artifact
+```
+
+Integration tests use [Testcontainers.MsSql](https://dotnet.testcontainers.org/) — Docker is pre-installed on `ubuntu-latest`, no manual setup needed.
+
+### CD (`cd.yml`) — runs on push to `main`
+
+```
+test job:   same steps as CI
+deploy job: Azure login
+            → Build Docker image → Push to ACR (tagged with commit SHA + latest)
+            → Deploy to App Service (azure/webapps-deploy@v3 pulls the SHA-tagged image)
+            → Open SQL firewall for runner IP → Run EF migrations → Close firewall
+            → Health check /health (waits 30s for F1 cold start)
+```
+
+The `deploy` job only runs if `test` passes. The SQL firewall is always closed after migrations (`if: always()`).
+
+### One-time GitHub Secrets setup
+
+**1. Create the Service Principal:**
+
+```bash
+SUBSCRIPTION_ID=$(az account show --query id --output tsv)
+RESOURCE_GROUP="rg-dotnetazstarter-dev"
+
+# Outputs JSON — copy the entire block as the AZURE_CREDENTIALS secret value
+az ad sp create-for-rbac \
+  --name "sp-dotnetazstarter-github-actions" \
+  --role Contributor \
+  --scopes "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP" \
+  --sdk-auth
+```
+
+**2. Grant the SP `AcrPush` on the registry:**
+
+```bash
+az role assignment create \
+  --assignee "sp-dotnetazstarter-github-actions" \
+  --role AcrPush \
+  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ContainerRegistry/registries/dotnetazstarterdevacr"
+```
+
+**3. Add these secrets to the GitHub repository** (Settings → Secrets → Actions):
+
+| Secret | Value |
+|---|---|
+| `AZURE_CREDENTIALS` | Full JSON from `az ad sp create-for-rbac --sdk-auth` |
+| `AZURE_RESOURCE_GROUP` | `rg-dotnetazstarter-dev` |
+| `AZURE_WEBAPP_NAME` | `app-dotnetazstarter-dev` |
+| `ACR_LOGIN_SERVER` | `dotnetazstarterdevacr.azurecr.io` |
+| `AZURE_SQL_CONNECTION_STRING` | `Server=tcp:sql-dotnetazstarter-dev.database.windows.net,1433;Database=StarterDb;User Id=sqladmin;Password=...;Encrypt=True;TrustServerCertificate=False;` |
+| `AZURE_PREFIX` | `dotnetazstarter` |
+| `AZURE_ENVIRONMENT` | `dev` |
+
+`AZURE_PREFIX` and `AZURE_ENVIRONMENT` let the workflow reconstruct the SQL server name (`sql-{prefix}-{environment}`) using the same naming formula as the Bicep, without an additional secret for the full server name.
 
 ---
 
@@ -400,8 +475,8 @@ This boilerplate is built around the following non-negotiable standards:
 - [x] Phase 4 — Docker: multi-stage Dockerfile, full docker-compose stack (API + DB), health checks
 - [x] Phase 5 — Tests: 72 tests across unit, architecture (NetArchTest), and integration (Testcontainers)
 - [x] Phase 6 — Azure Bicep: App Service, SQL Database, Key Vault, App Insights — one-command provisioning
-- [ ] Phase 7 — GitHub Actions: CI pipeline, CD to Azure App Service
-- [ ] Phase 8 — Polish: Serilog, Application Insights, FluentValidation, README badges
+- [x] Phase 7 — GitHub Actions: CI on PR (72 tests), CD to Azure App Service via Docker + ACR
+- [ ] Phase 8 — Polish: Serilog, Application Insights, FluentValidation
 
 ---
 

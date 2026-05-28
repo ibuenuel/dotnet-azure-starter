@@ -28,6 +28,17 @@ module sqlModule 'sql-server.bicep' = {
   }
 }
 
+// ─── Azure Container Registry ────────────────────────────────────────────────
+
+module acrModule 'acr.bicep' = {
+  name: 'deploy-acr'
+  params: {
+    prefix: prefix
+    environment: environment
+    location: location
+  }
+}
+
 // ─── Key Vault + DB secret ────────────────────────────────────────────────────
 
 module kvModule 'keyvault.bicep' = {
@@ -49,6 +60,9 @@ module appModule 'app-service.bicep' = {
     environment: environment
     location: location
     dbSecretUri: kvModule.outputs.dbSecretUri
+    acrLoginServer: acrModule.outputs.acrLoginServer
+    acrName: acrModule.outputs.acrName
+    imageName: 'dotnetazurestarter-api'
   }
 }
 
@@ -85,3 +99,5 @@ output appUrl string = appModule.outputs.appUrl
 output webAppName string = appModule.outputs.webAppName
 output keyVaultName string = kvModule.outputs.keyVaultName
 output sqlServerFqdn string = sqlModule.outputs.sqlServerFqdn
+output acrLoginServer string = acrModule.outputs.acrLoginServer
+output acrName string = acrModule.outputs.acrName
