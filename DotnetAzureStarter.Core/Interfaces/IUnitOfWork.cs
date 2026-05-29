@@ -9,7 +9,7 @@ namespace DotnetAzureStarter.Core.Interfaces;
 public interface IUnitOfWork : IDisposable
 {
 
-    // TODO(ismail): Replace with your own domain's repository — this is a sample.
+    // TODO: Replace with your own domain's repository — this is a sample.
     /// <summary>Todo item repository. Replace with your own aggregate root repositories.</summary>
     ITodoRepository Todos { get; }
 
