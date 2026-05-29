@@ -10,6 +10,8 @@
 
 > Built as a reference implementation for Senior Engineers and a starting point for new projects. Every pattern here has a reason; nothing is added speculatively.
 
+> **UI companion:** [dotnet-azure-starter-ui](https://github.com/ibuenuel/dotnet-azure-starter-ui) — example frontend consuming this API. · [Live Demo](https://brave-grass-0b871c503.7.azurestaticapps.net/)
+
 > **Status:** Phases 1–8 complete. Production-ready boilerplate. 72 tests (unit, integration, architecture) — all green. Azure Bicep IaC + GitHub Actions CI/CD fully implemented.
 
 ---
@@ -447,6 +449,8 @@ The Todo domain is a **reference implementation** — it demonstrates every patt
 | 9 | Register in DI | `Api/Program.cs` |
 
 Everything in `Common/` — `Result`, `Error`, `ApiResponse`, `PagedResult`, `IRepository<T>`, `BaseEntity` — requires no changes.
+
+Looking for a frontend to pair with this API? See [dotnet-azure-starter-ui](https://github.com/ibuenuel/dotnet-azure-starter-ui) for an example UI implementation — or try the [Live Demo](https://brave-grass-0b871c503.7.azurestaticapps.net/).
 
 ---
 
