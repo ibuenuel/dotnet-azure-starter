@@ -1,4 +1,5 @@
 @description('Resource name prefix')
+@minLength(3)
 param prefix string
 
 @description('Environment name (dev, prod)')
