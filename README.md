@@ -4,13 +4,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Azure](https://img.shields.io/badge/Azure-App%20Service%20%2B%20SQL-0078D4)](https://azure.microsoft.com)
 [![CI](https://github.com/ibuenuel/dotnet-azure-starter/actions/workflows/ci.yml/badge.svg)](https://github.com/ibuenuel/dotnet-azure-starter/actions/workflows/ci.yml)
-[![CD](https://github.com/ibuenuel/dotnet-azure-starter/actions/workflows/cd.yml/badge.svg)](https://github.com/ibuenuel/dotnet-azure-starter/actions/workflows/cd.yml)
 
 **Production-ready ASP.NET Core 10 boilerplate** implementing Clean Architecture, the Result Pattern, and Unit of Work — ready to clone and build on.
 
 > Built as a reference implementation for Senior Engineers and a starting point for new projects. Every pattern here has a reason; nothing is added speculatively.
 
-> **Status:** Phases 1–7 complete. 72 tests (unit, integration, architecture) — all green. Azure Bicep IaC + GitHub Actions CI/CD fully implemented.
+> **Status:** Phases 1–8 complete. Production-ready boilerplate. 72 tests (unit, integration, architecture) — all green. Azure Bicep IaC + GitHub Actions CI/CD fully implemented.
 
 ---
 
@@ -28,23 +27,11 @@ Most boilerplates either under-engineer (no structure beyond `Controllers/`) or 
 
 Clean Architecture with four strict layers. Dependencies flow inward only.
 
-```
-                 ┌─────────────────────────────────┐
-                 │        API (Presentation)       │
-                 │  Controllers · Middleware       │
-                 └───────────┬────────────┬────────┘
-                             │            │
-                     depends on      depends on
-                             │            │
-                             ▼            ▼
-              ┌──────────────────┐   ┌──────────────────────┐
-              │  Infrastructure  │   │  Core (Domain)       │
-              │  EF Core · Repos │   │  Entities · DTOs     │
-              │  Services · UoW  │   │  Interfaces          │
-              └──────────────────┘   │  Result · Error      │
-                        │            │  ApiResponse         │
-                   depends on        │  zero ext. deps      │
-                        └───────────►└──────────────────────┘
+```mermaid
+graph TD
+    A["API (Presentation)<br/>Controllers · Middleware"] --> B["Infrastructure<br/>EF Core · Repos · Services · UoW"]
+    A --> C["Core (Domain)<br/>Entities · DTOs · Interfaces<br/>Result · Error · ApiResponse<br/>zero ext. deps"]
+    B --> C
 ```
 
 | Allowed dependency | Forbidden |
@@ -121,15 +108,15 @@ var result = await _todoService.GetAllAsync(new PaginationRequest(page: 1, pageS
 | ORM | Entity Framework Core 10 | Implemented |
 | Database (local) | SQL Server 2022 via Docker Compose | Implemented |
 | Database (cloud) | Azure SQL Database | Implemented |
-| Auth | Azure AD / Microsoft Entra ID | Planned — Phase 7+ |
+| Auth | Azure AD / Microsoft Entra ID | Future release |
 | Cloud | Microsoft Azure (App Service, SQL, Key Vault) | Implemented |
 | IaC | Azure Bicep | Implemented — |
 | CI/CD | GitHub Actions | Implemented |
 | Containers | Docker + Docker Compose | Implemented |
 | API Docs | Built-in .NET 10 OpenAPI | Implemented |
 | Testing | xUnit · Moq · FluentAssertions · NetArchTest · Testcontainers | Implemented |
-| Validation | FluentValidation | Planned — Phase 8 |
-| Logging | Serilog + Azure Application Insights | Planned — Phase 8 |
+| Validation | FluentValidation | Future release |
+| Logging | Serilog + Azure Application Insights | Future release |
 
 ---
 
@@ -476,7 +463,7 @@ This boilerplate is built around the following non-negotiable standards:
 - [x] Phase 5 — Tests: 72 tests across unit, architecture (NetArchTest), and integration (Testcontainers)
 - [x] Phase 6 — Azure Bicep: App Service, SQL Database, Key Vault, App Insights — one-command provisioning
 - [x] Phase 7 — GitHub Actions: CI on PR (72 tests), CD to Azure App Service via Docker + ACR
-- [ ] Phase 8 — Polish: Serilog, Application Insights, FluentValidation
+- [x] Phase 8 — Polish: CONTRIBUTING.md, Mermaid architecture diagram, GitHub template setup
 
 ---
 
