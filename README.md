@@ -110,7 +110,7 @@ var result = await _todoService.GetAllAsync(new PaginationRequest(page: 1, pageS
 | Database (cloud) | Azure SQL Database | Implemented |
 | Auth | Azure AD / Microsoft Entra ID | Future release |
 | Cloud | Microsoft Azure (App Service, SQL, Key Vault) | Implemented |
-| IaC | Azure Bicep | Implemented — |
+| IaC | Azure Bicep | Implemented |
 | CI/CD | GitHub Actions | Implemented |
 | Containers | Docker + Docker Compose | Implemented |
 | API Docs | Built-in .NET 10 OpenAPI | Implemented |
