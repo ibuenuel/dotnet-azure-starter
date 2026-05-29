@@ -4,6 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Azure](https://img.shields.io/badge/Azure-App%20Service%20%2B%20SQL-0078D4)](https://azure.microsoft.com)
 [![CI](https://github.com/ibuenuel/dotnet-azure-starter/actions/workflows/ci.yml/badge.svg)](https://github.com/ibuenuel/dotnet-azure-starter/actions/workflows/ci.yml)
+[![CD](https://github.com/ibuenuel/dotnet-azure-starter/actions/workflows/cd.yml/badge.svg)](https://github.com/ibuenuel/dotnet-azure-starter/actions/workflows/cd.yml)
 
 **Production-ready ASP.NET Core 10 boilerplate** implementing Clean Architecture, the Result Pattern, and Unit of Work — ready to clone and build on.
 
@@ -267,27 +268,42 @@ The full Azure stack (App Service, SQL Database, Key Vault, App Insights) is pro
 az group create --name rg-dotnetazstarter-dev --location westeurope
 ```
 
-**2. Validate the template (no resources created):**
+**2. Create `infra/parameters.local.json` for your password (gitignored):**
 
-```bash
-az deployment group validate --resource-group rg-dotnetazstarter-dev --template-file infra/main.bicep --parameters @infra/parameters.json --parameters sqlAdminLogin=sqladmin sqlAdminPassword=<your-password>
+```json
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "sqlAdminPassword": {
+      "value": "YourStrong!Passw0rd"
+    }
+  }
+}
 ```
 
-**3. Preview what will be created (What-If):**
+> `parameters.local.json` is gitignored — your password never ends up in source control.
+> Alternatively, pass the password inline: `--parameters sqlAdminPassword='YourStrong!Passw0rd'`
+
+**3. Validate the template (no resources created):**
 
 ```bash
-az deployment group what-if --resource-group rg-dotnetazstarter-dev --template-file infra/main.bicep --parameters @infra/parameters.json --parameters sqlAdminLogin=sqladmin sqlAdminPassword=<your-password>
+az deployment group validate --resource-group rg-dotnetazstarter-dev --template-file infra/main.bicep --parameters infra/parameters.json infra/parameters.local.json
 ```
 
-**4. Deploy:**
+**4. Preview what will be created (What-If):**
 
 ```bash
-az deployment group create --resource-group rg-dotnetazstarter-dev --template-file infra/main.bicep --parameters @infra/parameters.json --parameters sqlAdminLogin=sqladmin sqlAdminPassword=<your-password>
+az deployment group what-if --resource-group rg-dotnetazstarter-dev --template-file infra/main.bicep --parameters infra/parameters.json infra/parameters.local.json
 ```
 
-> **PowerShell users:** Wrap passwords containing `!` in single quotes: `sqlAdminPassword='YourStr0ng!Pwd'`
+**5. Deploy:**
 
-**5. Verify the deployment:**
+```bash
+az deployment group create --resource-group rg-dotnetazstarter-dev --template-file infra/main.bicep --parameters infra/parameters.json infra/parameters.local.json
+```
+
+**6. Verify the deployment:**
 
 ```bash
 # Check the app is running
