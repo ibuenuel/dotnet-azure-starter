@@ -95,6 +95,7 @@ jobs:
         run: |
           dotnet ef database update \
             --no-build \
+            --configuration Release \
             --project DotnetAzureStarter.Infrastructure/DotnetAzureStarter.Infrastructure.csproj \
             --startup-project DotnetAzureStarter.Api/DotnetAzureStarter.Api.csproj \
             --verbose
